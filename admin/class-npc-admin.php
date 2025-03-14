@@ -226,19 +226,7 @@ class NPC_Admin {
                                     </td>
                                     <td>
                                         <div class="sample-data">
-                                            <?php if (!empty($sample_data)) : ?>
-                                                <ul>
-                                                    <?php foreach ($sample_data as $index => $row) : ?>
-                                                        <?php if (isset($row[$headers[0]])) : ?>
-                                                            <li><?php echo esc_html($row[$headers[0]]); ?></li>
-                                                        <?php endif; ?>
-                                                        <?php if ($index >= 2) break; // Show only first 3 samples ?>
-                                                    <?php endforeach; ?>
-                                                </ul>
-                                                <a href="#" class="toggle-sample-data">Show Samples</a>
-                                            <?php else : ?>
-                                                <p>No sample data available.</p>
-                                            <?php endif; ?>
+                                            
                                         </div>
                                     </td>
                                 </tr>
@@ -275,6 +263,36 @@ class NPC_Admin {
                 </form>
             </div>
         </div>
+        <script>
+        jQuery(document).ready(function($) {
+            // Store preview data in JavaScript
+            var previewData = <?php echo json_encode($sample_data); ?>;
+            
+            $('select[name^="column_mapping"]').on('change', function() {
+                var select = $(this);
+                var row = select.closest('tr');
+                var sampleCell = row.find('.sample-data');
+                var selectedIndex = select.val();
+                
+                // Clear sample data if no column is selected
+                if (selectedIndex === '') {
+                    sampleCell.html('');
+                    return;
+                }
+                
+                // Get sample data for selected column
+                var samples = [];
+                previewData.forEach(function(row) {
+                    if (row[selectedIndex]) {
+                        samples.push(row[selectedIndex]);
+                    }
+                });
+                
+                // Update the sample data cell
+                sampleCell.html(samples.join(', '));
+            });
+        });
+        </script>
         <?php
     }
 
