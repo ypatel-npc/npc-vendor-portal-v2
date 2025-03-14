@@ -68,8 +68,8 @@ class NPC_Admin {
      */
     public function add_plugin_admin_menu() {
         add_menu_page(
-            'NPC',
-            'NPC',
+            'NPC Vendor Portal',
+            'NPC Vendor Portal',
             'manage_options',
             'npc',
             array($this, 'display_plugin_admin_page'),
