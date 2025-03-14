@@ -1,0 +1,166 @@
+/**
+ * Admin CSS for NPC
+ */
+
+.card {
+    max-width: 100%;
+    margin-top: 20px;
+    padding: 20px;
+}
+
+.csv-preview {
+    margin-top: 30px;
+    overflow-x: auto;
+}
+
+.csv-preview table {
+    min-width: 100%;
+}
+
+.sample-data ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.sample-data li {
+    margin: 0;
+    word-break: break-all;
+}
+
+.import-summary {
+    background: #f8f8f8;
+    border-left: 4px solid #0073aa;
+    padding: 10px 15px;
+    margin-bottom: 20px;
+}
+
+.import-summary ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.widefat td, .widefat th {
+    padding: 10px;
+}
+
+.next-steps {
+    margin-top: 30px;
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 3px;
+}
+
+.next-steps h3 {
+    margin-top: 0;
+}
+
+.next-steps ol {
+    margin-left: 20px;
+}
+
+/* Processing options */
+.processing-options {
+    margin: 30px 0;
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 3px;
+}
+
+.processing-options h3 {
+    margin-top: 0;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+}
+
+.option-section {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.option-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.group-by-options label {
+    display: inline-block;
+    margin-right: 15px;
+    margin-bottom: 10px;
+}
+
+.aggregate-options {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px dashed #ddd;
+}
+
+.aggregate-options table {
+    max-width: 500px;
+}
+
+/* Query results */
+.query-results {
+    margin-top: 20px;
+    overflow-x: auto;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.query-results table {
+    min-width: 100%;
+}
+
+/* Match statistics */
+.match-stats {
+    display: flex;
+    justify-content: space-between;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.match-stat-box {
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    text-align: center;
+    flex: 1;
+    margin: 0 10px 10px 0;
+    min-width: 120px;
+}
+
+.match-stat-number {
+    display: block;
+    font-size: 24px;
+    font-weight: bold;
+    color: #0073aa;
+    margin-bottom: 5px;
+}
+
+.match-stat-label {
+    display: block;
+    font-size: 14px;
+    color: #666;
+}
+
+.match-highlight {
+    background-color: #fffde7;
+}
+
+/* Responsive tables */
+@media screen and (max-width: 782px) {
+    .widefat td, .widefat th {
+        padding: 8px 10px;
+    }
+    
+    .match-stats {
+        flex-direction: column;
+    }
+    
+    .match-stat-box {
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+}
