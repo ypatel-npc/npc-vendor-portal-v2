@@ -70,6 +70,9 @@ class NPC {
         $this->loader->add_action('admin_post_run_custom_query', $plugin_admin, 'run_custom_query');
         $this->loader->add_action('admin_post_match_skus', $plugin_admin, 'match_skus');
         $this->loader->add_action('admin_post_export_match_results', $plugin_admin, 'export_match_results');
+        
+        // Add drop all tables action
+        $this->loader->add_action('admin_post_npc_drop_all_tables', $plugin_admin, 'handle_drop_all_tables');
     }
 
     /**

@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: NPC ------------
+ * Plugin Name: NPC vendor portal v2
  * Plugin URI: 
  * Description: A plugin for importing CSV files, mapping columns, and processing data in batches.
  * Version: 1.0.0

@@ -736,12 +736,30 @@ class NPC_Admin {
                 <div class="notice notice-success is-dismissible">
                     <p>Table dropped successfully.</p>
                 </div>
+            <?php elseif ($message === 'all_tables_dropped') : ?>
+                <div class="notice notice-success is-dismissible">
+                    <p>All tables dropped successfully.</p>
+                </div>
             <?php endif; ?>
             
             <div class="card">
                 <h2>Imported Data Tables</h2>
                 
                 <?php if (!empty($tables)) : ?>
+                    <div class="tablenav top">
+                        <div class="alignleft actions">
+                            <a href="<?php echo esc_url(wp_nonce_url(
+                                admin_url('admin-post.php?action=npc_drop_all_tables'),
+                                'npc_drop_all_tables',
+                                'npc_drop_all_nonce'
+                            )); ?>" 
+                            class="button button-secondary" 
+                            onclick="return confirm('Are you sure you want to drop all import tables? This action cannot be undone.');">
+                                Drop All Tables
+                            </a>
+                        </div>
+                    </div>
+                    
                     <table class="widefat striped">
                         <thead>
                             <tr>
@@ -1144,6 +1162,53 @@ class NPC_Admin {
             ));
         } else {
             wp_die('Failed to drop table.');
+        }
+        
+        exit;
+    }
+
+    /**
+     * Handle drop all tables request.
+     *
+     * @since    1.0.0
+     */
+    public function handle_drop_all_tables() {
+        // Verify nonce
+        if (!isset($_GET['npc_drop_all_nonce']) || !wp_verify_nonce($_GET['npc_drop_all_nonce'], 'npc_drop_all_tables')) {
+            wp_die('Invalid nonce specified', 'Error', array('response' => 403));
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die('You do not have sufficient permissions to access this page.');
+        }
+        
+        // Create a processor instance
+        $processor = new NPC_Processor();
+        
+        // Get all import tables
+        $tables = $processor->get_import_tables();
+        
+        // Drop each table
+        $success = true;
+        foreach ($tables as $table_name) {
+            if (!$processor->delete_import_table($table_name)) {
+                $success = false;
+                break;
+            }
+        }
+        
+        if ($success) {
+            // Redirect back to tables page with success message
+            wp_redirect(add_query_arg(
+                array(
+                    'page' => 'npc-tables',
+                    'message' => 'all_tables_dropped'
+                ),
+                admin_url('admin.php')
+            ));
+        } else {
+            wp_die('Failed to drop all tables.');
         }
         
         exit;
