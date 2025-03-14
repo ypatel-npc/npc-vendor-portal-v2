@@ -1069,74 +1069,80 @@ class NPC_Admin {
      * @since    1.0.0
      */
     public function export_match_results() {
-        // Verify nonce with matching name
-        if (!isset($_POST['npc_export_nonce']) || 
-            !wp_verify_nonce($_POST['npc_export_nonce'], 'npc_export')) {
+        // Verify nonce and permissions
+        if (!isset($_POST['npc_export_nonce']) || !wp_verify_nonce($_POST['npc_export_nonce'], 'npc_export')) {
             wp_die('Invalid nonce specified', 'Error', array('response' => 403));
         }
         
-        // Check user capabilities
         if (!current_user_can('manage_options')) {
             wp_die('You do not have sufficient permissions to access this page.');
         }
         
-        // Get export options from POST data
         $table_name = isset($_POST['table_name']) ? sanitize_text_field($_POST['table_name']) : '';
-        $export_type = isset($_POST['export_type']) ? sanitize_text_field($_POST['export_type']) : 'all';
         
         if (empty($table_name)) {
             wp_die('Table name is required.');
         }
         
-        // Create a processor instance
-        $processor = new NPC_Processor();
+        global $wpdb;
         
-        // Build the WHERE clause based on export type
-        $where = '';
-        switch ($export_type) {
-            case 'matched':
-                $where = "match_status != 'None'";
-                break;
-            case 'unmatched':
-                $where = "match_status = 'None'";
-                break;
-            case 'hollander':
-                $where = "match_status = 'Hollander'";
-                break;
-            case 'inventory':
-                $where = "match_status = 'Inventory'";
-                break;
-            case 'both':
-                $where = "match_status = 'Both'";
-                break;
-        }
+        // Use the exact match results query
+        $query = $wpdb->prepare("
+            SELECT DISTINCT 
+                n.*,
+                h.hollander_no, 
+                i.inventory_no AS mapped_sku
+            FROM {$table_name} n
+            INNER JOIN `test_play`.hollander h
+                ON n.sku COLLATE utf8mb4_unicode_ci = h.hollander_no COLLATE utf8mb4_unicode_ci
+            INNER JOIN `test_play`.inventory_hollander_map ihm 
+                ON h.hollander_id = ihm.hollander_id
+            INNER JOIN `test_play`.inventory i 
+                ON ihm.inventory_id = i.inventory_id
+            WHERE n.sku IS NOT NULL
+        ");
         
-        // Get the results
-        $results = $processor->perform_join_query($table_name, '', '', '*', $where);
+        $results = $wpdb->get_results($query, ARRAY_A);
         
         if (empty($results)) {
-            wp_die('No data to export.');
+            wp_die('No matched results found to export.');
+        }
+        
+        // Clean output buffer
+        while (ob_get_level()) {
+            ob_end_clean();
         }
         
         // Set headers for CSV download
-        header('Content-Type: text/csv');
-        header('Content-Disposition: attachment; filename="match_results_' . date('Y-m-d_H-i-s') . '.csv"');
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="matched_results_' . date('Y-m-d_H-i-s') . '.csv"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
         
-        // Create output handle
-        $output = fopen('php://output', 'w');
-        
-        // Write headers
-        fputcsv($output, array_keys($results[0]));
-        
-        // Write data
-        foreach ($results as $row) {
-            fputcsv($output, $row);
+        try {
+            $output = fopen('php://output', 'w');
+            
+            if ($output === false) {
+                throw new Exception('Failed to open output stream');
+            }
+            
+            // Get headers dynamically from the first row
+            $headers = array_keys($results[0]);
+            
+            // Write headers
+            fputcsv($output, $headers);
+            
+            // Write data rows
+            foreach ($results as $row) {
+                fputcsv($output, $row);
+            }
+            
+            fclose($output);
+            
+        } catch (Exception $e) {
+            wp_die('Export failed: ' . $e->getMessage());
         }
         
-        // Close the file pointer
-        fclose($output);
-        
-        // Exit to prevent any additional output
         exit;
     }
 
