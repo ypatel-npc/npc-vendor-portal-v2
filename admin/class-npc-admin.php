@@ -746,6 +746,140 @@ class NPC_Admin {
         // Check for messages
         $message = isset($_GET['message']) ? sanitize_text_field($_GET['message']) : '';
         
+        // At the beginning of display_import_tables_page()
+        if (isset($_GET['action']) && $_GET['action'] === 'view' && 
+            isset($_GET['table_name']) && isset($_GET['_wpnonce']) && 
+            wp_verify_nonce($_GET['_wpnonce'], 'view_table_data')) {
+            
+            $table_name = sanitize_text_field($_GET['table_name']);
+            global $wpdb;
+            
+            // Pagination settings
+            $per_page = 20; // Number of records per page
+            $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+            $offset = ($current_page - 1) * $per_page;
+            
+            // Get total count of records
+            $total_items = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name}");
+            $total_pages = ceil($total_items / $per_page);
+            
+            // Get paginated data
+            $results = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT * FROM {$table_name} LIMIT %d OFFSET %d", 
+                    $per_page, 
+                    $offset
+                ), 
+                ARRAY_A
+            );
+            
+            if (empty($results)) {
+                echo '<div class="wrap">';
+                echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
+                echo '<div class="notice notice-error"><p>No data found in table.</p></div>';
+                echo '<a href="' . esc_url(admin_url('admin.php?page=npc-tables')) . '" class="button">Back to Tables</a>';
+                echo '</div>';
+                return;
+            }
+            
+            echo '<div class="wrap">';
+            echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
+            echo '<h2>Table: ' . esc_html($table_name) . '</h2>';
+            echo '<a href="' . esc_url(admin_url('admin.php?page=npc-tables')) . '" class="button">Back to Tables</a>';
+            
+            // Pagination controls - top
+            if ($total_pages > 1) {
+                echo '<div class="tablenav top">';
+                echo '<div class="tablenav-pages">';
+                echo '<span class="displaying-num">' . number_format($total_items) . ' items</span>';
+                
+                // Previous page link
+                if ($current_page > 1) {
+                    echo '<a class="prev-page button" href="' . esc_url(add_query_arg(array(
+                        'paged' => $current_page - 1,
+                        'action' => 'view',
+                        'table_name' => $table_name,
+                        '_wpnonce' => wp_create_nonce('view_table_data')
+                    ), admin_url('admin.php?page=npc-tables'))) . '"><span class="screen-reader-text">Previous page</span><span aria-hidden="true">‹</span></a>';
+                }
+                
+                // Page numbers
+                echo '<span class="pagination-links">';
+                echo '<span class="paging-input">' . $current_page . ' of <span class="total-pages">' . $total_pages . '</span></span>';
+                
+                // Next page link
+                if ($current_page < $total_pages) {
+                    echo '<a class="next-page button" href="' . esc_url(add_query_arg(array(
+                        'paged' => $current_page + 1,
+                        'action' => 'view',
+                        'table_name' => $table_name,
+                        '_wpnonce' => wp_create_nonce('view_table_data')
+                    ), admin_url('admin.php?page=npc-tables'))) . '"><span class="screen-reader-text">Next page</span><span aria-hidden="true">›</span></a>';
+                }
+                
+                echo '</span></div></div>';
+            }
+            
+            echo '<div style="margin-top: 20px; overflow-x: auto;">';
+            echo '<table class="widefat striped">';
+            
+            // Headers
+            echo '<thead><tr>';
+            foreach (array_keys($results[0]) as $header) {
+                echo '<th>' . esc_html($header) . '</th>';
+            }
+            echo '</tr></thead>';
+            
+            // Data
+            echo '<tbody>';
+            foreach ($results as $row) {
+                echo '<tr>';
+                foreach ($row as $value) {
+                    echo '<td>' . esc_html($value) . '</td>';
+                }
+                echo '</tr>';
+            }
+            echo '</tbody>';
+            echo '</table>';
+            echo '</div>';
+            
+            // Pagination controls - bottom
+            if ($total_pages > 1) {
+                echo '<div class="tablenav bottom">';
+                echo '<div class="tablenav-pages">';
+                echo '<span class="displaying-num">' . number_format($total_items) . ' items</span>';
+                
+                // Previous page link
+                if ($current_page > 1) {
+                    echo '<a class="prev-page button" href="' . esc_url(add_query_arg(array(
+                        'paged' => $current_page - 1,
+                        'action' => 'view',
+                        'table_name' => $table_name,
+                        '_wpnonce' => wp_create_nonce('view_table_data')
+                    ), admin_url('admin.php?page=npc-tables'))) . '"><span class="screen-reader-text">Previous page</span><span aria-hidden="true">‹</span></a>';
+                }
+                
+                // Page numbers
+                echo '<span class="pagination-links">';
+                echo '<span class="paging-input">' . $current_page . ' of <span class="total-pages">' . $total_pages . '</span></span>';
+                
+                // Next page link
+                if ($current_page < $total_pages) {
+                    echo '<a class="next-page button" href="' . esc_url(add_query_arg(array(
+                        'paged' => $current_page + 1,
+                        'action' => 'view',
+                        'table_name' => $table_name,
+                        '_wpnonce' => wp_create_nonce('view_table_data')
+                    ), admin_url('admin.php?page=npc-tables'))) . '"><span class="screen-reader-text">Next page</span><span aria-hidden="true">›</span></a>';
+                }
+                
+                echo '</span></div></div>';
+            }
+            
+            echo '</div>';
+            return;
+        }
+        
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
@@ -794,12 +928,22 @@ class NPC_Admin {
                                     <td><?php echo esc_html($table['vendor_name']); ?></td>
                                     <td><?php echo esc_html($table['created_date']); ?></td>
                                     <td>
+                                        <a href="<?php echo esc_url(add_query_arg(
+                                            array(
+                                                'page' => 'npc-tables',
+                                                'action' => 'view',
+                                                'table_name' => $table['table_name'],
+                                                '_wpnonce' => wp_create_nonce('view_table_data')
+                                            ),
+                                            admin_url('admin.php')
+                                        )); ?>" class="button button-primary">View Data</a>
+                                        
                                         <a href="<?php echo esc_url(wp_nonce_url(
                                             admin_url('admin-post.php?action=npc_drop_table&table=' . $table['table_name']),
                                             'npc_drop_table',
                                             'npc_drop_nonce'
                                         )); ?>" 
-                                        class="button button-small" 
+                                        class="button button-secondary" 
                                         onclick="return confirm('Are you sure you want to drop this table?');">
                                             Drop Table
                                         </a>
