@@ -518,7 +518,8 @@ class NPC_Processor {
         
         // Start with the basic SQL - removed TEMPORARY keyword for development
         $sql = "CREATE TABLE `$table_name` (
-            `id` bigint(20) NOT NULL AUTO_INCREMENT,";
+            `id` bigint(20) NOT NULL AUTO_INCREMENT,
+            `is_flagged` TINYINT(1) NOT NULL DEFAULT 0,";
         
         // Add columns
         foreach ($columns as $column) {
@@ -895,7 +896,8 @@ class NPC_Processor {
 
         // Create table
         $sql = "CREATE TABLE IF NOT EXISTS $table_name (
-            id bigint(20) NOT NULL AUTO_INCREMENT,";
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            is_flagged TINYINT(1) NOT NULL DEFAULT 0,";
 
         foreach ($headers as $header) {
             $column_name = sanitize_key($header);

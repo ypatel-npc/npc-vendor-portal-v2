@@ -1740,24 +1740,29 @@ class NPC_Admin {
         }
 
         global $wpdb;
-
+        error_log('NPC Plugin: Holding batch');
+        
         // Get and sanitize the table name
         $table_name = sanitize_text_field($_POST['table_name']);
         
-        // Update the table status to 'hold'
-        $result = $wpdb->update(
-            $wpdb->prefix . 'npc_import_tables',
-            array('status' => 'hold'),
-            array('table_name' => $table_name),
-            array('%s'),
-            array('%s')
-        );
+        // First, check if the is_flagged column exists in the table
+        $columns = $wpdb->get_results("SHOW COLUMNS FROM `{$table_name}` LIKE 'is_flagged'");
+        
+        // If the column doesn't exist, add it
+        if (empty($columns)) {
+            $wpdb->query("ALTER TABLE `{$table_name}` ADD COLUMN `is_flagged` TINYINT(1) DEFAULT 0");
+        }
+        
+        // Update all rows in the table to set is_flagged to 1
+        $result = $wpdb->query("UPDATE `{$table_name}` SET `is_flagged` = 1");
+        
+        error_log('NPC Plugin: Holding batch result: ' . $result);
 
         if ($result === false) {
             // Handle error
             wp_redirect(add_query_arg(
                 array(
-                    'page' => 'npc-vendor-portal-v2',
+                    'page' => 'npc',
                     'step' => 'match_results',
                     'error' => 'hold_failed'
                 ),
@@ -1769,7 +1774,7 @@ class NPC_Admin {
         // Redirect back to match results with success message
         wp_redirect(add_query_arg(
             array(
-                'page' => 'npc-vendor-portal-v2',
+                'page' => 'npc',
                 'step' => 'match_results',
                 'message' => 'batch_held'
             ),
