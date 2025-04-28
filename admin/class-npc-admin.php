@@ -41,6 +41,8 @@ class NPC_Admin {
         add_action('admin_post_npc_match', array($this, 'match_skus'));
         add_action('admin_post_npc_export', array($this, 'export_match_results'));
         add_action('admin_post_npc_drop_table', array($this, 'handle_drop_table'));
+        add_action('admin_post_npc_create_po', array($this, 'handle_create_po'));
+        add_action('admin_post_npc_hold_batch', array($this, 'handle_hold_batch'));
     }
 
     /**
@@ -112,6 +114,8 @@ class NPC_Admin {
             $this->display_match_step();
         } elseif ($step === 'match_results') {
             $this->display_match_results();
+        } elseif ($step === 'create_po') {
+            $this->display_create_po();
         }
     }
 
@@ -622,6 +626,22 @@ class NPC_Admin {
     private function display_match_results() {
         global $wpdb;
         
+        if (isset($_GET['message']) && $_GET['message'] === 'batch_held') {
+            ?>
+            <div class="notice notice-success is-dismissible">
+                <p><?php _e('Batch has been successfully put on hold.', 'npc-vendor-portal-v2'); ?></p>
+            </div>
+            <?php
+        }
+
+        if (isset($_GET['error']) && $_GET['error'] === 'hold_failed') {
+            ?>
+            <div class="notice notice-error is-dismissible">
+                <p><?php _e('Failed to put batch on hold. Please try again.', 'npc-vendor-portal-v2'); ?></p>
+            </div>
+            <?php
+        }
+
         // Get match results from transient
         $match_results = get_transient('npc_match_results');
         
@@ -630,13 +650,18 @@ class NPC_Admin {
         }
         
         $table_name = $match_results['table_name'];
-        
-        // Execute the custom matching query
-        $results = $wpdb->get_results("
-            SELECT DISTINCT 
-                n.*,  
-                h.hollander_no, 
-                i.inventory_no AS mapped_sku
+		$query = "
+			SELECT DISTINCT 
+                n.sku as 'Vendor SKU',
+				n.price as 'Vendor Price',
+				n.location as 'Vendor Location',
+				n.quantity as 'Vendor Quantity',
+				n.description as 'Vendor Description',
+				h.hollander_no as 'NPC Hollander No',
+				i.inventory_no as 'NPC Hardware No',	
+				s.mfr_software_no as 'NPC Software',
+				sds.Need_3mo as '3 Month Demand',  
+				sds.Need_6mo as '6 Month Demand'
             FROM {$table_name} n
             INNER JOIN `test_play`.hollander h  
                 ON n.sku COLLATE utf8mb4_unicode_ci = h.hollander_no COLLATE utf8mb4_unicode_ci
@@ -644,9 +669,15 @@ class NPC_Admin {
                 ON h.hollander_id = ihm.hollander_id
             INNER JOIN `test_play`.inventory i 
                 ON ihm.inventory_id = i.inventory_id
+			INNER JOIN `test_play`.software s 
+				on  i.inventory_id = s.inventory_id
+			inner join npcwebsite.sales_demand_summary sds     
+				ON sds.SKU COLLATE utf8mb4_general_ci = i.inventory_no COLLATE utf8mb4_general_ci 
             WHERE n.sku IS NOT NULL
-        ", ARRAY_A);
-        
+        ";
+		$results = $wpdb->get_results($query, ARRAY_A);
+		// error_log(print_r($results, true));
+		// die();
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
@@ -675,14 +706,21 @@ class NPC_Admin {
                     <table class="widefat striped">
                         <thead>
                             <tr>
-                                <th>SKU</th>
-                                <th>Hollander Number</th>
-                                <th>Mapped SKU</th>
+                                <th>Vendor SKU</th>
+                                <th>Vendor Price</th>
+                                <th>Vendor Location</th>
+                                <th>Vendor Quantity</th>
+                                <th>Vendor Description</th>
+								<th>NPC Hollander No</th>
+								<th>NPC Hardware No</th>
+                                <th>NPC Software</th>
+                                <th>3 Month Demand</th>
+                                <th>6 Month Demand</th>
                                 <?php 
                                 // Get additional columns from first result
                                 $first_row = reset($results);
                                 foreach ($first_row as $key => $value) {
-                                    if (!in_array($key, ['sku', 'hollander_no', 'mapped_sku'])) {
+                                    if (!in_array($key, ['sku', 'hollander_no', 'mapped_sku', 'Vendor SKU', 'Vendor Price', 'Vendor Location', 'Vendor Quantity', 'Vendor Description', 'NPC Software', '3 Month Demand', '6 Month Demand', 'NPC Hollander No', 'NPC Hardware No'])) {
                                         echo '<th>' . esc_html(ucwords(str_replace('_', ' ', $key))) . '</th>';
                                     }
                                 }
@@ -692,12 +730,19 @@ class NPC_Admin {
                         <tbody>
                             <?php foreach ($results as $row) : ?>
                                 <tr>
-                                    <td><?php echo esc_html($row['sku']); ?></td>
-                                    <td><?php echo esc_html($row['hollander_no']); ?></td>
-                                    <td><?php echo esc_html($row['mapped_sku']); ?></td>
+                                    <td><?php echo esc_html($row['Vendor SKU']); ?></td>
+                                    <td><?php echo esc_html($row['Vendor Price']); ?></td>
+                                    <td><?php echo esc_html($row['Vendor Location']); ?></td>
+                                    <td><?php echo esc_html($row['Vendor Quantity']); ?></td>
+                                    <td><?php echo esc_html($row['Vendor Description']); ?></td>
+                                    <td><?php echo esc_html($row['NPC Hollander No']); ?></td>
+                                    <td><?php echo esc_html($row['NPC Hardware No']); ?></td>
+                                    <td><?php echo esc_html($row['NPC Software']); ?></td>
+                                    <td><?php echo esc_html($row['3 Month Demand']); ?></td>
+                                    <td><?php echo esc_html($row['6 Month Demand']); ?></td>
                                     <?php 
                                     foreach ($row as $key => $value) {
-                                        if (!in_array($key, ['sku', 'hollander_no', 'mapped_sku'])) {
+                                        if (!in_array($key, ['sku', 'hollander_no', 'mapped_sku', 'Vendor SKU', 'Vendor Price', 'Vendor Location', 'Vendor Quantity', 'Vendor Description', 'NPC Software', '3 Month Demand', '6 Month Demand', 'NPC Hollander No', 'NPC Hardware No'])) {
                                             echo '<td>' . esc_html($value) . '</td>';
                                         }
                                     }
@@ -726,6 +771,30 @@ class NPC_Admin {
                         <input type="hidden" name="table_name" value="<?php echo esc_attr($match_results['table_name']); ?>">
                         
                         <?php submit_button('Export to CSV', 'secondary', 'submit', true); ?>
+                    </form>
+
+                    <h3>Create Purchase Orders</h3>
+                    <p>Create purchase orders based on the matched results and demand data.</p>
+                    
+                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                        <input type="hidden" name="action" value="npc_create_po">
+                        <?php wp_nonce_field('npc_create_po', 'npc_create_po_nonce'); ?>
+                        
+                        <input type="hidden" name="table_name" value="<?php echo esc_attr($match_results['table_name']); ?>">
+                        
+                        <?php submit_button('Create Purchase Orders', 'primary', 'submit', true); ?>
+                    </form>
+
+                    <h3>Hold Batch</h3>
+                    <p>Mark this batch as held for later processing.</p>
+                    
+                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                        <input type="hidden" name="action" value="npc_hold_batch">
+                        <?php wp_nonce_field('npc_hold_batch', 'npc_hold_batch_nonce'); ?>
+                        
+                        <input type="hidden" name="table_name" value="<?php echo esc_attr($match_results['table_name']); ?>">
+                        
+                        <?php submit_button('Hold Batch', 'secondary', 'submit', true); ?>
                     </form>
                 </div>
             </div>
@@ -1379,6 +1448,333 @@ class NPC_Admin {
             wp_die('Failed to drop all tables.');
         }
         
+        exit;
+    }
+
+    /**
+     * Display the create PO form.
+     *
+     * @since    1.0.0
+     */
+    private function display_create_po() {
+        global $wpdb;
+        
+        // Get match results from transient
+        $match_results = get_transient('npc_match_results');
+        
+        if (empty($match_results)) {
+            wp_die('Match results not found. Please try again.');
+        }
+        
+        $table_name = $match_results['table_name'];
+        
+        // Get the matched results with demand data
+        $query = "
+            SELECT DISTINCT 
+                n.sku as 'Vendor SKU',
+                n.price as 'Vendor Price',
+                n.location as 'Vendor Location',
+                n.quantity as 'Vendor Quantity',
+                n.description as 'Vendor Description',
+                s.mfr_software_no as 'NPC Software',
+                sds.Need_3mo as '3 Month Demand',  
+                sds.Need_6mo as '6 Month Demand',
+                CASE 
+                    WHEN sds.Need_3mo > 0 THEN LEAST(sds.Need_3mo, n.quantity)
+                    ELSE 0 
+                END as 'Suggested Order Quantity'
+            FROM {$table_name} n
+            INNER JOIN `test_play`.hollander h  
+                ON n.sku COLLATE utf8mb4_unicode_ci = h.hollander_no COLLATE utf8mb4_unicode_ci
+            INNER JOIN `test_play`.inventory_hollander_map ihm 
+                ON h.hollander_id = ihm.hollander_id
+            INNER JOIN `test_play`.inventory i 
+                ON ihm.inventory_id = i.inventory_id
+            INNER JOIN `test_play`.software s 
+                on i.inventory_id = s.inventory_id
+            INNER JOIN npcwebsite.sales_demand_summary sds     
+                ON sds.SKU COLLATE utf8mb4_general_ci = i.inventory_no COLLATE utf8mb4_general_ci 
+            WHERE n.sku IS NOT NULL
+            AND sds.Need_3mo > 0
+            ORDER BY sds.Need_3mo DESC
+        ";
+        
+        $results = $wpdb->get_results($query, ARRAY_A);
+        
+        ?>
+        <div class="wrap">
+            <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+            
+            <div class="card">
+                <h2>Create Purchase Orders</h2>
+                
+                <?php if (!empty($results)) : ?>
+                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                        <input type="hidden" name="action" value="npc_create_po">
+                        <?php wp_nonce_field('npc_create_po', 'npc_create_po_nonce'); ?>
+                        
+                        <input type="hidden" name="table_name" value="<?php echo esc_attr($table_name); ?>">
+                        
+                        <table class="widefat striped">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="select-all"></th>
+                                    <th>Vendor SKU</th>
+                                    <th>NPC Software</th>
+                                    <th>Vendor Price</th>
+                                    <th>Available Quantity</th>
+                                    <th>3 Month Demand</th>
+                                    <th>Suggested Order Quantity</th>
+                                    <th>Order Quantity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($results as $row) : ?>
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" name="items[]" value="<?php echo esc_attr($row['Vendor SKU']); ?>">
+                                        </td>
+                                        <td><?php echo esc_html($row['Vendor SKU']); ?></td>
+                                        <td><?php echo esc_html($row['NPC Software']); ?></td>
+                                        <td><?php echo esc_html($row['Vendor Price']); ?></td>
+                                        <td><?php echo esc_html($row['Vendor Quantity']); ?></td>
+                                        <td><?php echo esc_html($row['3 Month Demand']); ?></td>
+                                        <td><?php echo esc_html($row['Suggested Order Quantity']); ?></td>
+                                        <td>
+                                            <input type="number" 
+                                                name="quantity[<?php echo esc_attr($row['Vendor SKU']); ?>]" 
+                                                value="<?php echo esc_attr($row['Suggested Order Quantity']); ?>"
+                                                min="0"
+                                                max="<?php echo esc_attr($row['Vendor Quantity']); ?>"
+                                                class="small-text">
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        
+                        <div class="po-options">
+                            <h3>Purchase Order Options</h3>
+                            <table class="form-table">
+                                <tr>
+                                    <th scope="row"><label for="po_reference">PO Reference</label></th>
+                                    <td>
+                                        <input type="text" name="po_reference" id="po_reference" class="regular-text" required>
+                                        <p class="description">Enter a reference number for this purchase order.</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row"><label for="po_notes">Notes</label></th>
+                                    <td>
+                                        <textarea name="po_notes" id="po_notes" class="large-text" rows="3"></textarea>
+                                        <p class="description">Add any notes or special instructions for this purchase order.</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <?php submit_button('Generate Purchase Order', 'primary', 'submit', true); ?>
+                    </form>
+                    
+                    <script>
+                    jQuery(document).ready(function($) {
+                        // Handle select all checkbox
+                        $('#select-all').on('change', function() {
+                            $('input[name="items[]"]').prop('checked', $(this).prop('checked'));
+                        });
+                        
+                        // Update select all when individual checkboxes change
+                        $('input[name="items[]"]').on('change', function() {
+                            var allChecked = $('input[name="items[]"]:checked').length === $('input[name="items[]"]').length;
+                            $('#select-all').prop('checked', allChecked);
+                        });
+                    });
+                    </script>
+                <?php else : ?>
+                    <div class="notice notice-warning">
+                        <p>No items found with demand in the next 3 months.</p>
+                    </div>
+                    
+                    <p>
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=npc&step=match_results')); ?>" class="button">Back to Match Results</a>
+                    </p>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Handle PO creation form submission.
+     *
+     * @since    1.0.0
+     */
+    public function handle_create_po() {
+        // Verify nonce
+        if (!isset($_POST['npc_create_po_nonce']) || !wp_verify_nonce($_POST['npc_create_po_nonce'], 'npc_create_po')) {
+            wp_die('Invalid nonce specified', 'Error', array('response' => 403));
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die('You do not have sufficient permissions to access this page.');
+        }
+        
+        // Get form data
+        $table_name = isset($_POST['table_name']) ? sanitize_text_field($_POST['table_name']) : '';
+        $po_reference = isset($_POST['po_reference']) ? sanitize_text_field($_POST['po_reference']) : '';
+        $po_notes = isset($_POST['po_notes']) ? sanitize_textarea_field($_POST['po_notes']) : '';
+        $selected_items = isset($_POST['items']) ? array_map('sanitize_text_field', $_POST['items']) : array();
+        $quantities = isset($_POST['quantity']) ? array_map('intval', $_POST['quantity']) : array();
+        
+        if (empty($table_name) || empty($po_reference) || empty($selected_items)) {
+            wp_die('Required fields are missing.');
+        }
+        
+        global $wpdb;
+        
+        // Start transaction
+        $wpdb->query('START TRANSACTION');
+        
+        try {
+            // Insert PO header
+            $wpdb->insert(
+                'purchase_orders',
+                array(
+                    'reference_number' => $po_reference,
+                    'notes' => $po_notes,
+                    'status' => 'pending',
+                    'created_at' => current_time('mysql'),
+                    'created_by' => get_current_user_id()
+                ),
+                array('%s', '%s', '%s', '%s', '%d')
+            );
+            
+            $po_id = $wpdb->insert_id;
+            
+            if (!$po_id) {
+                throw new Exception('Failed to create purchase order header.');
+            }
+            
+            // Insert PO items
+            foreach ($selected_items as $sku) {
+                if (!isset($quantities[$sku]) || $quantities[$sku] <= 0) {
+                    continue;
+                }
+                
+                // Get item details
+                $item = $wpdb->get_row($wpdb->prepare("
+                    SELECT 
+                        n.sku,
+                        n.price,
+                        n.description,
+                        s.mfr_software_no as npc_sku
+                    FROM {$table_name} n
+                    INNER JOIN `test_play`.hollander h  
+                        ON n.sku COLLATE utf8mb4_unicode_ci = h.hollander_no COLLATE utf8mb4_unicode_ci
+                    INNER JOIN `test_play`.inventory_hollander_map ihm 
+                        ON h.hollander_id = ihm.hollander_id
+                    INNER JOIN `test_play`.inventory i 
+                        ON ihm.inventory_id = i.inventory_id
+                    INNER JOIN `test_play`.software s 
+                        on i.inventory_id = s.inventory_id
+                    WHERE n.sku = %s
+                    LIMIT 1
+                ", $sku), ARRAY_A);
+                
+                if (!$item) {
+                    continue;
+                }
+                
+                $wpdb->insert(
+                    'purchase_order_items',
+                    array(
+                        'po_id' => $po_id,
+                        'vendor_sku' => $item['sku'],
+                        'npc_sku' => $item['npc_sku'],
+                        'description' => $item['description'],
+                        'quantity' => $quantities[$sku],
+                        'unit_price' => $item['price'],
+                        'total_price' => $quantities[$sku] * $item['price']
+                    ),
+                    array('%d', '%s', '%s', '%s', '%d', '%f', '%f')
+                );
+                
+                if ($wpdb->last_error) {
+                    throw new Exception('Failed to create purchase order item: ' . $wpdb->last_error);
+                }
+            }
+            
+            // Commit transaction
+            $wpdb->query('COMMIT');
+            
+            // Store PO ID in transient for display
+            set_transient('npc_created_po_id', $po_id, HOUR_IN_SECONDS);
+            
+            // Redirect to PO view page
+            wp_redirect(admin_url('admin.php?page=npc&step=view_po&id=' . $po_id));
+            exit;
+            
+        } catch (Exception $e) {
+            // Rollback transaction
+            $wpdb->query('ROLLBACK');
+            wp_die('Failed to create purchase order: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Handle the hold batch action
+     */
+    public function handle_hold_batch() {
+        // Verify nonce
+        if (!isset($_POST['npc_hold_batch_nonce']) || !wp_verify_nonce($_POST['npc_hold_batch_nonce'], 'npc_hold_batch')) {
+            wp_die('Invalid nonce specified', 'Error', array(
+                'response' => 403,
+                'back_link' => true,
+            ));
+        }
+
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die('You do not have sufficient permissions to access this page.');
+        }
+
+        global $wpdb;
+
+        // Get and sanitize the table name
+        $table_name = sanitize_text_field($_POST['table_name']);
+        
+        // Update the table status to 'hold'
+        $result = $wpdb->update(
+            $wpdb->prefix . 'npc_import_tables',
+            array('status' => 'hold'),
+            array('table_name' => $table_name),
+            array('%s'),
+            array('%s')
+        );
+
+        if ($result === false) {
+            // Handle error
+            wp_redirect(add_query_arg(
+                array(
+                    'page' => 'npc-vendor-portal-v2',
+                    'step' => 'match_results',
+                    'error' => 'hold_failed'
+                ),
+                admin_url('admin.php')
+            ));
+            exit;
+        }
+
+        // Redirect back to match results with success message
+        wp_redirect(add_query_arg(
+            array(
+                'page' => 'npc-vendor-portal-v2',
+                'step' => 'match_results',
+                'message' => 'batch_held'
+            ),
+            admin_url('admin.php')
+        ));
         exit;
     }
 }
